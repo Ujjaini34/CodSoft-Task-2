@@ -1,0 +1,92 @@
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+
+# Load data
+df = pd.read_csv(r'C:\Users\Ujjaini\OneDrive\Desktop\CodSoft\IMDb Movies India.csv', encoding='latin1')
+
+# Inspect the column names
+print("Column names in the dataframe:", df.columns)
+
+# Check if the expected columns are present
+expected_columns = ['genre', 'director', 'actors', 'rating']
+missing_columns = [col for col in expected_columns if col not in df.columns]
+
+if missing_columns:
+    print(f"Missing columns: {missing_columns}")
+else:
+    # Preprocess data
+    df = df.dropna()  # handle missing values
+
+    # Define preprocessing for categorical features
+    categorical_features = ['genre', 'director', 'actors']
+    categorical_transformer = OneHotEncoder(handle_unknown='ignore')
+
+    # Create the preprocessing pipeline
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('cat', categorical_transformer, categorical_features)
+        ])
+
+    # Split data into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(df.drop('rating', axis=1), df['rating'], test_size=0.2, random_state=42)
+
+    # Define the model pipeline for Random Forest
+    rf_model = Pipeline(steps=[
+        ('preprocessor', preprocessor),
+        ('regressor', RandomForestRegressor(random_state=42))
+    ])
+
+    # Define the parameter grid for hyperparameter tuning
+    param_grid_rf = {
+        'regressor__n_estimators': [100, 200, 300],
+        'regressor__max_depth': [None, 10, 20],
+        'regressor__min_samples_split': [2, 5, 10]
+    }
+
+    # Perform GridSearchCV for Random Forest
+    grid_search_rf = GridSearchCV(rf_model, param_grid_rf, cv=5, scoring='neg_mean_squared_error')
+    grid_search_rf.fit(X_train, y_train)
+    best_rf_model = grid_search_rf.best_estimator_
+
+    # Evaluate the best Random Forest model
+    y_pred_rf = best_rf_model.predict(X_test)
+    mse_rf = mean_squared_error(y_test, y_pred_rf)
+    mae_rf = mean_absolute_error(y_test, y_pred_rf)
+    r2_rf = r2_score(y_test, y_pred_rf)
+    print(f'Random Forest - MSE: {mse_rf:.2f}, MAE: {mae_rf:.2f}, R2: {r2_rf:.2f}')
+
+    # Define the model pipeline for Gradient Boosting
+    gb_model = Pipeline(steps=[
+        ('preprocessor', preprocessor),
+        ('regressor', GradientBoostingRegressor(random_state=42))
+    ])
+
+    # Define the parameter grid for hyperparameter tuning
+    param_grid_gb = {
+        'regressor__n_estimators': [100, 200, 300],
+        'regressor__learning_rate': [0.01, 0.1, 0.2],
+        'regressor__max_depth': [3, 5, 7]
+    }
+
+    # Perform GridSearchCV for Gradient Boosting
+    grid_search_gb = GridSearchCV(gb_model, param_grid_gb, cv=5, scoring='neg_mean_squared_error')
+    grid_search_gb.fit(X_train, y_train)
+    best_gb_model = grid_search_gb.best_estimator_
+
+    # Evaluate the best Gradient Boosting model
+    y_pred_gb = best_gb_model.predict(X_test)
+    mse_gb = mean_squared_error(y_test, y_pred_gb)
+    mae_gb = mean_absolute_error(y_test, y_pred_gb)
+    r2_gb = r2_score(y_test, y_pred_gb)
+    print(f'Gradient Boosting - MSE: {mse_gb:.2f}, MAE: {mae_gb:.2f}, R2: {r2_gb:.2f}')
+
+    # Compare model performances
+    if r2_gb > r2_rf:
+        print("Gradient Boosting Regressor performs better.")
+    else:
+        print("Random Forest Regressor performs better.")
